@@ -38,6 +38,7 @@ struct Drawable
 	int Width, Height, PosX, PosY;
 	Drawable(const char* path,int width,int height,int posx,int posy)
 		:Path(path),Width(width),Height(height),PosX(posx),PosY(posy){}
+	Drawable() = default;
 };
 class MyFramework : public Framework {
 
@@ -52,9 +53,9 @@ public:
 	Drawable* Platform;
 	virtual void PreInit(int& width, int& height, bool& fullscreen)
 	{
-		Background  = new Drawable(BackgroundPath, 320, 512, 0, 0);
+		Background  = new Drawable(BackgroundPath, 620, 1024, 0, 0);
 		Doodle = new Drawable(DoodleIdlePath, 62, 60, Background->Width / 2 - 32, Background->Height / 2 - 30);
-		Platform = new Drawable(PlatformPath, 68, 14, 0, 0);
+		Platform = new Drawable[30];
 		std::cout << " wee";
 		width = Background->Width;
 		height = Background->Height;
@@ -63,16 +64,28 @@ public:
 
 	virtual bool Init() {
 
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<> distr1(Doodle->Height, Background->Height);
+		std::uniform_int_distribution<> distr2(0, Background->Width-68);
+		for (int i = 0; i < 30; i++)
+		{
+			Platform[i].Path = PlatformPath;
+			Platform[i].Width = 68;
+			Platform[i].Height = 14;
+			Platform[i].sprite = createSprite(PlatformPath);
+			setSpriteSize(Platform[i].sprite, Platform[i].Width, Platform[i].Height);
+			Platform[i].PosX = distr2(gen);
+			Platform[i].PosY = distr1(gen);
+		}
 		Background ->sprite  = createSprite(Background->Path);
 		Doodle ->sprite  = createSprite(Doodle->Path);
-		Platform   ->sprite    = createSprite(Platform->Path);
 		DoodleLeft = createSprite(DoodleLeftPath);
 		DoodleRight = createSprite(DoodleRightPath);
 		DoodleIdle = createSprite(DoodleIdlePath);
 
 		setSpriteSize(Background->sprite, Background->Width, Background->Height);
 		setSpriteSize(Doodle->sprite, Doodle->Width, Doodle->Height);
-		setSpriteSize(Platform->sprite, Platform->Width, Platform->Height);
 		setSpriteSize(DoodleLeft, 62, 60);
 		setSpriteSize(DoodleRight, 62, 60);
 		setSpriteSize(DoodleIdle, 62, 60);
@@ -93,15 +106,17 @@ public:
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(20 - DeltaTime));
 		}
-		drawTestBackground();
+		//drawTestBackground();
 		jump += 0.2;
 		Doodle->PosY += jump;
 		if (Doodle->PosY > Background->Height-Doodle->Height) jump = -10;
 		drawSprite(Background->sprite, 0, CameraMover);
 		drawSprite(Background->sprite, 0, -Background->Height + CameraMover);
 		drawSprite(Doodle->sprite, Doodle->PosX + PlayerMover, Doodle->PosY++);		drawSprite(Doodle->sprite, -Doodle->PosX + PlayerMover - Doodle->Width, Doodle->PosY );
-		drawSprite(Platform->sprite, Background->Width / 2 - Platform->Width / 2, Background->Height - Platform->Height / 2);
-		
+		for (int i = 0; i < 30; i++) 
+		{
+			drawSprite(Platform[i].sprite, Platform[i].PosX, Platform[i].PosY);
+		}
 		//CameraMover++;
 		
 		if (CameraMover == Background->Height)
