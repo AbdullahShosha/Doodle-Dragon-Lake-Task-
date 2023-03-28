@@ -3,12 +3,14 @@
 #include "Framework.h"
 #include <iostream>
 #include <random>
+#include <chrono>
+#include <thread>
 
 
-static int CameraMover = 0;
-static int PlayerMover = 0;
 static bool IsMovingRight = false;
 static bool IsMovingLeft = false;
+static bool IsJumping = false;
+static int JumpHeight = 200;
 const char* BackgroundPath     = "data\\2X\\bck@2x.png";
 const char* DoodleLeftPath     = "data\\2X\\bunny-left.png";
 const char* DoodleRightPath    = "data\\2X\\bunny-right.png";
@@ -40,6 +42,11 @@ struct Drawable
 class MyFramework : public Framework {
 
 public:
+	unsigned int time = 0;
+	unsigned int DeltaTime = 0;
+	int CameraMover = 0;
+	int PlayerMover = 0;
+	float jump = 0;
 	Drawable* Background;
 	Drawable* Doodle;
 	Drawable* Platform;
@@ -79,23 +86,34 @@ public:
 	}
 
 	virtual bool Tick() {
-        //drawTestBackground();
-		
+		//seting frame limit to 50   --1/50 * 1000--
+		DeltaTime = getTickCount() - time;
+		time = getTickCount();
+		if (DeltaTime < 20)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(20 - DeltaTime));
+		}
+		drawTestBackground();
+		jump += 0.2;
+		Doodle->PosY += jump;
+		if (Doodle->PosY > Background->Height-Doodle->Height) jump = -10;
 		drawSprite(Background->sprite, 0, CameraMover);
-		drawSprite(Background->sprite, 0, -Background->Height+ CameraMover);
-		drawSprite(Doodle->sprite, Doodle->PosX+PlayerMover, Doodle->PosY);
-		drawSprite(Doodle->sprite, -Doodle->PosX+PlayerMover-Doodle->Width, Doodle->PosY);
+		drawSprite(Background->sprite, 0, -Background->Height + CameraMover);
+		drawSprite(Doodle->sprite, Doodle->PosX + PlayerMover, Doodle->PosY++);		drawSprite(Doodle->sprite, -Doodle->PosX + PlayerMover - Doodle->Width, Doodle->PosY );
 		drawSprite(Platform->sprite, Background->Width / 2 - Platform->Width / 2, Background->Height - Platform->Height / 2);
-		CameraMover++;
+		
+		//CameraMover++;
+		
 		if (CameraMover == Background->Height)
 			CameraMover = 0;
+		
 		if (IsMovingLeft)
 		{
 			if (PlayerMover == 0)
 			{
 				PlayerMover = Background->Width;
 			}
-			PlayerMover--;
+			PlayerMover-=3;
 		}
 		else if (IsMovingRight)
 		{
@@ -103,8 +121,9 @@ public:
 			{
 				PlayerMover = 0;
 			}
-			PlayerMover++;
+			PlayerMover+=3;
 		}
+		
 		return false;
 	}
 
