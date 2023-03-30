@@ -6,7 +6,8 @@
 #include <chrono>
 #include <thread>
 
-
+int Window_Width;
+int Window_Height;
 static bool IsMovingRight = false;
 static bool IsMovingLeft = false;
 static bool IsJumping = false;
@@ -21,16 +22,12 @@ Sprite* DoodleLeft;
 Sprite* DoodleRight;
 Sprite* DoodleIdle;
 
+std::random_device rd;
+std::mt19937 gen(rd());
 
 /* Test Framework realization */
 
-int RandomGen(int l,int h)
-{
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> dis(l, h);
-	return dis(gen);
-}
+
 struct Drawable 
 {
 	const char* Path;
@@ -43,32 +40,31 @@ struct Drawable
 class MyFramework : public Framework {
 
 public:
+	int CloneXpos;
 	unsigned int time = 0;
 	unsigned int DeltaTime = 0;
 	int CameraMover = 0;
 	int PlayerMover = 0;
 	float jump = 0;
+	int Number_Of_Platforms = 20;
 	Drawable* Background;
 	Drawable* Doodle;
 	Drawable* Platform;
 	virtual void PreInit(int& width, int& height, bool& fullscreen)
 	{
-		Background  = new Drawable(BackgroundPath, 620, 1024, 0, 0);
+		Background  = new Drawable(BackgroundPath, Window_Width, Window_Height, 0, 0);
 		Doodle = new Drawable(DoodleIdlePath, 62, 60, Background->Width / 2 - 32, Background->Height / 2 - 30);
-		Platform = new Drawable[30];
-		std::cout << " wee";
+		CloneXpos = Doodle->PosX;
+		Platform = new Drawable[Number_Of_Platforms];
 		width = Background->Width;
 		height = Background->Height;
 		fullscreen = false;
 	}
 
 	virtual bool Init() {
-
-		std::random_device rd;
-		std::mt19937 gen(rd());
 		std::uniform_int_distribution<> distr1(Doodle->Height, Background->Height);
 		std::uniform_int_distribution<> distr2(0, Background->Width-68);
-		for (int i = 0; i < 30; i++)
+		for (int i = 0; i < Number_Of_Platforms; i++)
 		{
 			Platform[i].Path = PlatformPath;
 			Platform[i].Width = 68;
@@ -109,36 +105,65 @@ public:
 		//drawTestBackground();
 		jump += 0.2;
 		Doodle->PosY += jump;
-		if (Doodle->PosY > Background->Height-Doodle->Height) jump = -10;
+		//if (Doodle->PosY > Background->Height-Doodle->Height) jump = -10;
 		drawSprite(Background->sprite, 0, CameraMover);
-		drawSprite(Background->sprite, 0, -Background->Height + CameraMover);
-		drawSprite(Doodle->sprite, Doodle->PosX + PlayerMover, Doodle->PosY++);		drawSprite(Doodle->sprite, -Doodle->PosX + PlayerMover - Doodle->Width, Doodle->PosY );
-		for (int i = 0; i < 30; i++) 
+
+		//jumping
+		for (int i = 0; i < Number_Of_Platforms; i++)
 		{
+			if ((Doodle->PosX + Doodle->Width - 15 > Platform[i].PosX) 
+				&&(Doodle->PosX + Doodle->Width-15 < Platform[i].PosX + Platform[i].Width)
+				&&(Doodle->PosY + Doodle->Height > Platform[i].PosY) 
+				&&(Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
+				&&jump > 0)
+				jump = -10;
 			drawSprite(Platform[i].sprite, Platform[i].PosX, Platform[i].PosY);
 		}
-		//CameraMover++;
-		
-		if (CameraMover == Background->Height)
-			CameraMover = 0;
-		
+		//Moving left and right
 		if (IsMovingLeft)
 		{
-			if (PlayerMover == 0)
+			if (Doodle->PosX + Doodle->Width < 0)
 			{
-				PlayerMover = Background->Width;
+				Doodle->PosX += Background->Width;
 			}
-			PlayerMover-=3;
+			if (Doodle->PosX < 0)
+			{
+				CloneXpos = Doodle->PosX + Background->Width;
+			}
+			Doodle->PosX -= 3;
+			CloneXpos -= 3;
 		}
 		else if (IsMovingRight)
 		{
-			if (PlayerMover  == Background->Width)
+			if (Doodle->PosX > Background->Width)
 			{
-				PlayerMover = 0;
+				Doodle->PosX -= Background->Width;
 			}
-			PlayerMover+=3;
+			if (Doodle->PosX + Doodle->Width > Background->Width)
+			{
+				CloneXpos = Doodle->PosX - Background->Width;
+			}
+			Doodle->PosX += 3;
+			CloneXpos += 3;
 		}
-		
+		//moving the Platforms as the player goes higher
+		if (Doodle->PosY < Background->Height / 2)
+		{
+			for (int i = 0; i < Number_Of_Platforms; i++)
+			{
+				Doodle->PosY = Background->Height / 2;
+				Platform[i].PosY = Platform[i].PosY - jump;
+				if (Platform[i].PosY > Background->Height)
+				{
+					Platform[i].PosY = 0;
+					Platform[i].PosX = rand() % (Background->Width - Platform[i].Width);
+				}
+			}
+		}
+		drawSprite(Doodle->sprite, Doodle->PosX, Doodle->PosY);	
+		drawSprite(Doodle->sprite, CloneXpos, Doodle->PosY);
+		if (CameraMover == Background->Height)
+			CameraMover = 0;
 		return false;
 	}
 
@@ -147,9 +172,15 @@ public:
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
-		if (button == FRMouseButton::LEFT)
+		if (button == FRMouseButton::RIGHT)
 		{
-			
+			std::uniform_int_distribution<> distr1(Doodle->Height, Background->Height);
+			std::uniform_int_distribution<> distr2(0, Background->Width - 68);
+			for (int i = 0; i < Number_Of_Platforms; i++)
+			{
+				Platform[i].PosX = distr2(gen);
+				Platform[i].PosY = distr1(gen);
+			}
 		}
 	}
 
@@ -185,6 +216,11 @@ public:
 
 int main(int argc, char *argv[])
 {
+	std::cout << "Preferred size 320*512 or 640*1024\n";
+	std::cout << "Width :";
+	std::cin >> Window_Width;
+	std::cout << "Height :";
+	std::cin >> Window_Height;
 	MyFramework* FW = new MyFramework();
 	
 	//FW->PreInit(Width, Heigh, IsFullScreen);
