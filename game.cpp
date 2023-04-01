@@ -5,14 +5,16 @@
 #include <random>
 #include <chrono>
 #include <thread>
+#include <windows.h>
 
-int FindingEnemyProbability = 4;
+double BulletTimer = 0.0 , ShootingDelay = 2.0;
+int FindingEnemyProbability = 6;
 int Window_Width;
 int Window_Height;
 double Width_Scalar;
 double Height_Scalar;
-unsigned int Best_Score_Platforms = 0, Best_Score_Distance = 0,
-			 Score_Platforms = 0,Score_Distance = 0;
+unsigned int Best_Score_Platforms = 0, Best_Score_Distance = 0 , Best_Score_Enemies_killed,
+			 Score_Platforms = 0,Score_Distance = 0 , Score_Enemies_killed =0;
 static bool IsMovingRight = false;
 static bool IsMovingLeft = false;
 
@@ -22,14 +24,20 @@ const char* DoodleRightPath= "data\\X\\bunny-right.png";
 const char* DoodleIdlePath = "data\\X\\bunny-puca.png";
 const char* PlatformPath   = "data\\X\\Platform.png";
 const char* EnemyPath	   = "data\\X\\Monster.png";
+const char* BulletPath     = "data\\X\\bubble.png";
 
 Sprite* DoodleLeft;
 Sprite* DoodleRight;
 Sprite* DoodleIdle;
 Sprite* Enemy;
+Sprite* bullet;
 
 std::random_device rd;
 std::mt19937 gen(rd());
+
+//Handles for changine the score on console
+HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+COORD pos = { 0, 4 };
 
 /* Test Framework realization */
 
@@ -46,14 +54,8 @@ struct Drawable
 class MyFramework : public Framework {
 
 public:
-	
-	//Damagable  Player;
-	//Damagable  Enemy;
-	//GameObject background;
-	//Collidable Bullet;
-
 	static const int Number_Of_Platforms = 30;
-	//Collidable Platforms[Number_Of_Platforms] ;
+
 	int CloneXpos;
 	unsigned int time = 0;
 	unsigned int DeltaTime = 0;
@@ -64,6 +66,9 @@ public:
 	Drawable* Platform;
 	Drawable* Enemy;
 	bool* EnemyExist;
+	Drawable* Bullet;
+
+
 	virtual void PreInit(int& width, int& height, bool& fullscreen)
 	{
 		Width_Scalar = Window_Width / 640.0;
@@ -74,6 +79,7 @@ public:
 		Platform = new Drawable[Number_Of_Platforms];
 		Enemy	 = new Drawable[Number_Of_Platforms];
 		EnemyExist = new bool[Number_Of_Platforms];
+		Bullet = new Drawable;
 		width = Window_Width;
 		height = Window_Height;
 		fullscreen = false;
@@ -83,16 +89,6 @@ public:
 		std::uniform_int_distribution<> PlatformRndmYpos(Doodle->Height, Background->Height);
 		std::uniform_int_distribution<> PlatformRndmXpos(0, Background->Width-(68*Width_Scalar));
 		//1 enemy for every FindingEnemyProbability
-		std::uniform_int_distribution<> Enmyspawn(0,FindingEnemyProbability);
-		
-		
-		/*background.init(0, 0, Window_Width, Window_Height, BackgroundPath, createSprite(BackgroundPath));
-		Player.init(background._drawer._Dimensions.x / 2 - (31 * Width_Scalar),
-					background._drawer._Dimensions.y / 2 - (30 * Height_Scalar),
-					62 * Width_Scalar, 60 * Height_Scalar,
-					DoodleIdlePath,createSprite(DoodleIdlePath),100);*/
-		
-
 		for (int i = 0; i < Number_Of_Platforms; i++)
 		{
 			Platform[i].Path = PlatformPath;
@@ -109,7 +105,8 @@ public:
 			std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX+Platform[i].Width - Enemy[i].Width);
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Platform[i].PosY = PlatformRndmYpos(gen);
-			if (Enmyspawn(gen) == 0)
+			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+			if ((rand()%6) == 0)
 				EnemyExist[i] = true;
 		}
 		Background ->sprite  = createSprite(Background->Path);
@@ -140,22 +137,39 @@ public:
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(20 - DeltaTime));
 		}
-		//drawTestBackground();
+		drawSprite(Background->sprite, 0, 0);
+		//Player Movement
 		jump += 0.2;
 		Doodle->PosY += jump;
 		if (Doodle->PosY > Background->Height-Doodle->Height) ResetLevel();
-		drawSprite(Background->sprite, 0, 0);
 
 		//jumping
 		for (int i = 0; i < Number_Of_Platforms; i++)
 		{
-			if ((Doodle->PosX + Doodle->Width - 15 > Platform[i].PosX) 
-				&&(Doodle->PosX + Doodle->Width-15 < Platform[i].PosX + Platform[i].Width)
+			if ((((Doodle->PosX + Doodle->Width - 15 > Platform[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Platform[i].PosX + Platform[i].Width)) ||// left collision
+				((Doodle->PosX + 15 > Platform[i].PosX) && (Doodle->PosX + 15 < Platform[i].PosX + Platform[i].Width)))// right collision
 				&&(Doodle->PosY + Doodle->Height > Platform[i].PosY) 
 				&&(Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
 				&&jump > 0)
 				jump = -10 * Height_Scalar;
+			//killing Monsters
+			// the 15 here is offset to ignore the ears and doodle gun
+			if    ((((Doodle->PosX + Doodle->Width - 15 > Enemy[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Enemy[i].PosX + Enemy[i].Width))||// left collision
+				  ((Doodle->PosX  + 15 > Enemy[i].PosX) && (Doodle->PosX  + 15 < Enemy[i].PosX + Enemy[i].Width)))// right collision
+				&& (Doodle->PosY + Doodle->Height > Enemy[i].PosY)
+				&& (Doodle->PosY + Doodle->Height < Enemy[i].PosY + Enemy[i].Height) && EnemyExist[i])
+			{
+				if ((jump > 0))
+				{
+					EnemyExist[i] = false;
+					Score_Enemies_killed++;
+				}
+				else ResetLevel();
+			}
+			
+
 			drawSprite(Platform[i].sprite, Platform[i].PosX, Platform[i].PosY);
+			if(EnemyExist[i])
 			drawSprite(Enemy[i].sprite, Enemy[i].PosX, Platform[i].PosY - Enemy[i].Height);
 		}
 		//Moving left and right
@@ -192,7 +206,8 @@ public:
 			for (int i = 0; i < Number_Of_Platforms; i++)
 			{
 				Doodle->PosY = Background->Height / 2;
-				Platform[i].PosY = Platform[i].PosY - jump;
+				Platform[i].PosY -= jump;
+				Enemy[i].PosY -= jump;
 				if (Platform[i].PosY > Background->Height)
 				{
 					Score_Platforms++;
@@ -201,10 +216,14 @@ public:
 					std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 					Enemy[i].PosX = EnemyRndmXpos(gen);
 					Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+					if ((rand() % 6) == 0)
+						EnemyExist[i] = true;
 				}
 			}
-			std::cout << Score_Distance << " " << Score_Platforms << " " 
-					  << Best_Score_Distance << " " <<Best_Score_Platforms << '\n';
+			SetConsoleCursorPosition(hConsole, pos);
+			std::cout << "Distance\t Platforms\t Enemies\t Max Distance\t Max Platforms\t Max Enemies\n";
+			std::cout << Score_Distance << "\t\t" << Score_Platforms << "\t\t" << Score_Enemies_killed << "\t\t"
+					  << Best_Score_Distance << "\t\t" << Best_Score_Platforms << "\t\t" << Best_Score_Enemies_killed << '\n';
 		}
 		drawSprite(Doodle->sprite, Doodle->PosX, Doodle->PosY);	
 		drawSprite(Doodle->sprite, CloneXpos, Doodle->PosY);
@@ -218,7 +237,9 @@ public:
 			Best_Score_Platforms = Score_Platforms;
 		if (Score_Distance > Best_Score_Distance)
 			Best_Score_Distance = Score_Distance;
-		Score_Platforms = 0, Score_Distance = 0;
+		if (Score_Enemies_killed > Best_Score_Enemies_killed)
+			Best_Score_Enemies_killed = Score_Enemies_killed;
+		Score_Platforms = 0, Score_Distance = 0; Score_Enemies_killed = 0;
 		Doodle->PosX = Background->Width / 2 - (31 * Width_Scalar);
 		Doodle->PosY = Background->Height / 2 - (30 * Height_Scalar);
 		CloneXpos = Doodle->PosX;
@@ -229,10 +250,12 @@ public:
 			std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+			if ((rand() % 6) == 0)
+				EnemyExist[i] = true;
 		}
 	}
 	virtual void onMouseMove(int x, int y, int xrelative, int yrelative) {
-
+		std::cout << x << " " << y << " " << xrelative  << '\n';
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
@@ -247,6 +270,8 @@ public:
 				std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 				Enemy[i].PosX = EnemyRndmXpos(gen);
 				Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+				if ((rand() % 6) == 0)
+					EnemyExist[i] = true;
 			}
 		}
 	}
