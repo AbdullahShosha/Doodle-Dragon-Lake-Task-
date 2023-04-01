@@ -7,8 +7,16 @@
 #include <thread>
 #include <windows.h>
 
-double BulletTimer = 0.0 , ShootingDelay = 2.0;
-int FindingEnemyProbability = 6;
+unsigned int BulletTimer = 0, ShootingStartTime = 0, BulletSpeed = 6 ,BulletStartPosX, BulletStartPosY;
+double   BulletXMovement = 0.0, BulletYMovement = 0.0, DoneDistanceX = 0.0, DoneDistanceY = 0.0,
+TargetPlayerDistance;
+bool BulletIsMoving = false;
+
+int MouseXpos, MouseYpos;
+
+//Higher number means less enemies
+int FindingEnemyProbability = 10;
+
 int Window_Width;
 int Window_Height;
 double Width_Scalar;
@@ -18,13 +26,13 @@ unsigned int Best_Score_Platforms = 0, Best_Score_Distance = 0 , Best_Score_Enem
 static bool IsMovingRight = false;
 static bool IsMovingLeft = false;
 
-const char* BackgroundPath = "data\\X\\bck@2x.png";
+const char* BackgroundPath = "data\\X\\jungle-bck@2x.png";
 const char* DoodleLeftPath = "data\\X\\bunny-left.png";
 const char* DoodleRightPath= "data\\X\\bunny-right.png";
 const char* DoodleIdlePath = "data\\X\\bunny-puca.png";
 const char* PlatformPath   = "data\\X\\Platform.png";
 const char* EnemyPath	   = "data\\X\\Monster.png";
-const char* BulletPath     = "data\\X\\bubble.png";
+const char* BulletPath     = "data\\X\\bubble@2x.png";
 
 Sprite* DoodleLeft;
 Sprite* DoodleRight;
@@ -79,7 +87,7 @@ public:
 		Platform = new Drawable[Number_Of_Platforms];
 		Enemy	 = new Drawable[Number_Of_Platforms];
 		EnemyExist = new bool[Number_Of_Platforms];
-		Bullet = new Drawable;
+		
 		width = Window_Width;
 		height = Window_Height;
 		fullscreen = false;
@@ -106,7 +114,7 @@ public:
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Platform[i].PosY = PlatformRndmYpos(gen);
 			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
-			if ((rand()%6) == 0)
+			if ((rand()% FindingEnemyProbability) == 0)
 				EnemyExist[i] = true;
 		}
 		Background ->sprite  = createSprite(Background->Path);
@@ -120,6 +128,13 @@ public:
 		setSpriteSize(DoodleLeft,  Doodle->Width, Doodle->Height);
 		setSpriteSize(DoodleRight, Doodle->Width, Doodle->Height);
 		setSpriteSize(DoodleIdle , Doodle->Width ,Doodle->Height);
+		Bullet = new Drawable;
+		Bullet->Path = BulletPath;
+		Bullet->sprite = createSprite(BulletPath);
+		setSpriteSize(Bullet->sprite, 8, 8);
+		Bullet->Width = 8;Bullet->Height = 8;
+		Bullet->PosX = Doodle->PosX + (Doodle->Width / 2) - Bullet->Width/2;
+		Bullet->PosY = Doodle->PosY - Bullet->Height;
 		return true;
 	}
 
@@ -216,7 +231,7 @@ public:
 					std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 					Enemy[i].PosX = EnemyRndmXpos(gen);
 					Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
-					if ((rand() % 6) == 0)
+					if ((rand() % FindingEnemyProbability) == 0)
 						EnemyExist[i] = true;
 				}
 			}
@@ -227,6 +242,42 @@ public:
 		}
 		drawSprite(Doodle->sprite, Doodle->PosX, Doodle->PosY);	
 		drawSprite(Doodle->sprite, CloneXpos, Doodle->PosY);
+		
+		if (BulletIsMoving)
+		{
+			//std::cout << "BulletXMovement " << BulletXMovement << "\nBulletYMovement" << BulletYMovement;
+			DoneDistanceX += BulletXMovement;
+			DoneDistanceY += BulletYMovement;
+			Bullet->PosX = BulletStartPosX + round(DoneDistanceX);
+			if (Bullet->PosX >= Background->Width)Bullet->PosX -= Background->Width;
+			if (Bullet->PosX <= 0)Bullet->PosX += Background->Width;
+			Bullet->PosY = BulletStartPosY + round(DoneDistanceY);
+			//std::cout << "BulletStartPosX " << BulletStartPosX << "\nBulletStartPosX" << BulletStartPosX;
+			drawSprite(Bullet->sprite, Bullet->PosX , Bullet->PosY);
+			if ((getTickCount() - ShootingStartTime) >= 3000 || Bullet->PosY < 0 || Bullet->PosY > Background->Height)
+			{
+				BulletIsMoving = false;
+			}
+			for (int i = 0; i < Number_Of_Platforms; i++)
+			{
+				if ((((Bullet->PosX + Bullet->Width - 15 > Enemy[i].PosX) && (Bullet->PosX + Bullet->Width - 15 < Enemy[i].PosX + Enemy[i].Width)) ||// left collision
+					((Bullet->PosX + 15 > Enemy[i].PosX) && (Bullet->PosX + 15 < Enemy[i].PosX + Enemy[i].Width)))// right collision
+					&& (Bullet->PosY + Bullet->Height > Enemy[i].PosY)
+					&& (Bullet->PosY + Bullet->Height < Enemy[i].PosY + Enemy[i].Height) && EnemyExist[i])
+				{
+					EnemyExist[i] = false;
+					Score_Enemies_killed++;
+					BulletIsMoving = false;
+				}
+			}
+		}
+		else
+		{
+			BulletStartPosX = Doodle->PosX + (Doodle->Width / 2) - Bullet->Width / 2;
+			BulletStartPosY = Doodle->PosY - Bullet->Height;
+			Bullet->PosX = Doodle->PosX + (Doodle->Width / 2) - Bullet->Width / 2;
+			Bullet->PosY = Doodle->PosY - Bullet->Height;
+		}
 		return false;
 	}
 	void ResetLevel()
@@ -250,12 +301,13 @@ public:
 			std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
-			if ((rand() % 6) == 0)
+			if ((rand() % FindingEnemyProbability) == 0)
 				EnemyExist[i] = true;
 		}
 	}
 	virtual void onMouseMove(int x, int y, int xrelative, int yrelative) {
-		std::cout << x << " " << y << " " << xrelative  << '\n';
+		MouseXpos = x;
+		MouseYpos = y;
 	}
 
 	virtual void onMouseButtonClick(FRMouseButton button, bool isReleased) {
@@ -270,8 +322,24 @@ public:
 				std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 				Enemy[i].PosX = EnemyRndmXpos(gen);
 				Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
-				if ((rand() % 6) == 0)
+				if ((rand() % FindingEnemyProbability) == 0)
 					EnemyExist[i] = true;
+			}
+		}
+		if (button == FRMouseButton::LEFT)
+		{
+			if (!BulletIsMoving)
+			{
+				DoneDistanceX = 0.0;
+				DoneDistanceY = 0.0;
+				ShootingStartTime = getTickCount();
+				BulletIsMoving = true;
+				TargetPlayerDistance = sqrt(((MouseXpos - Bullet->PosX) * (MouseXpos - Bullet->PosX)) + ((MouseYpos - Bullet->PosY) * (MouseYpos - Bullet->PosY)));
+				//Normalization
+				BulletXMovement =  (MouseXpos - Bullet->PosX) / TargetPlayerDistance;
+				BulletYMovement =  (MouseYpos - Bullet->PosY) / TargetPlayerDistance;
+				BulletXMovement *= BulletSpeed;
+				BulletYMovement *= BulletSpeed;
 			}
 		}
 	}
