@@ -186,8 +186,11 @@ public:
 				&& (Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
 				&& jump > 0)
 			{
-				if (Oneuse[i] && PlatformExists) PlatformExists[i] = false;
-				jump = -10 * Height_Scalar;
+				if (PlatformExists[i])
+				{
+					PlatformExists[i] = false;
+					jump = -10 * Height_Scalar;
+				}
 			}
 			//killing Monsters
 			// the 15 here is offset to ignore the ears and doodle gun
