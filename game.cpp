@@ -61,6 +61,18 @@ struct Drawable
 	Drawable(const char* path,int width,int height,int posx,int posy)
 		:Path(path),Width(width),Height(height),PosX(posx),PosY(posy){}
 	Drawable() = default;
+
+	bool IsCollidingWith(Drawable another, int offset)
+	{
+		if ((((PosX + Width - offset > another.PosX) && (PosX + Width - offset < another.PosX + another.Width)) ||// left collision
+			((	PosX + offset > another.PosX) && (PosX + offset < another.PosX +  another.Width)))// right collision
+			&& (PosY + Height > another.PosY)
+			&& (PosY + Height < another.PosY + another.Height))
+		{
+			return true;
+		}
+		return false;
+	}
 };
 class MyFramework : public Framework {
 
@@ -180,24 +192,18 @@ public:
 		//jumping
 		for (int i = 0; i < Number_Of_Platforms; i++)
 		{
-			if ((((Doodle->PosX + Doodle->Width - 15 > Platform[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Platform[i].PosX + Platform[i].Width)) ||// left collision
-				((Doodle->PosX + 15 > Platform[i].PosX) && (Doodle->PosX + 15 < Platform[i].PosX + Platform[i].Width)))// right collision
-				&& (Doodle->PosY + Doodle->Height > Platform[i].PosY)
-				&& (Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
-				&& jump > 0)
+			if (Doodle->IsCollidingWith(Platform[i],15) && jump > 0)
 			{
-				if (PlatformExists[i])
+				if (PlatformExists[i] && Oneuse[i])
 				{
 					PlatformExists[i] = false;
-					jump = -10 * Height_Scalar;
+					EnemyExist[i] = false;
 				}
+				jump = -10 * Height_Scalar;
 			}
 			//killing Monsters
 			// the 15 here is offset to ignore the ears and doodle gun
-			if    ((((Doodle->PosX + Doodle->Width - 15 > Enemy[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Enemy[i].PosX + Enemy[i].Width))||// left collision
-				  ((Doodle->PosX  + 15 > Enemy[i].PosX) && (Doodle->PosX  + 15 < Enemy[i].PosX + Enemy[i].Width)))// right collision
-				&& (Doodle->PosY + Doodle->Height > Enemy[i].PosY)
-				&& (Doodle->PosY + Doodle->Height < Enemy[i].PosY + Enemy[i].Height) && EnemyExist[i])
+			if    (Doodle->IsCollidingWith(Enemy[i], 15) && EnemyExist[i])
 			{
 				if ((jump > 0))
 				{
@@ -292,10 +298,7 @@ public:
 			}
 			for (int i = 0; i < Number_Of_Platforms; i++)
 			{
-				if ((((Bullet->PosX + Bullet->Width - 15 > Enemy[i].PosX) && (Bullet->PosX + Bullet->Width - 15 < Enemy[i].PosX + Enemy[i].Width)) ||// left collision
-					((Bullet->PosX + 15 > Enemy[i].PosX) && (Bullet->PosX + 15 < Enemy[i].PosX + Enemy[i].Width)))// right collision
-					&& (Bullet->PosY + Bullet->Height > Enemy[i].PosY)
-					&& (Bullet->PosY + Bullet->Height < Enemy[i].PosY + Enemy[i].Height) && EnemyExist[i])
+				if (Bullet->IsCollidingWith(Enemy[i], 0) && EnemyExist[i])
 				{
 					EnemyExist[i] = false;
 					Score_Enemies_killed++;
