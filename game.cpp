@@ -7,7 +7,9 @@
 #include <thread>
 #include <windows.h>
 
-unsigned int BulletTimer = 0, ShootingStartTime = 0, BulletSpeed = 6 ,BulletStartPosX, BulletStartPosY;
+unsigned int BulletTimer = 0, ShootingStartTime = 0
+, BulletSpeed = 6, BulletStartPosX, BulletStartPosY,
+ImmunityStartTime = 0,ShieldPosX, ShieldPosY,RespawnShieldTimer=0,RandomTimer = 5000;
 double   BulletXMovement = 0.0, BulletYMovement = 0.0, DoneDistanceX = 0.0, DoneDistanceY = 0.0,
 TargetPlayerDistance;
 bool BulletIsMoving = false;
@@ -95,6 +97,7 @@ public:
 	bool* PlatformExists;
 	bool* Oneuse;
 	bool IsPlayerImmune = true;
+	bool IsShieldVisible = true;
 
 
 	virtual void PreInit(int& width, int& height, bool& fullscreen)
@@ -183,6 +186,10 @@ public:
 	}
 
 	virtual bool Tick() {
+
+		std::uniform_int_distribution<> ShieldRndmXpos(0, Background->Width - (30 * Width_Scalar));
+		std::uniform_int_distribution<> ShieldRndmYpos(0, Background->Height / 2 - (30 * Height_Scalar));
+		std::uniform_int_distribution<> ShieldSpawn(10000,15000 );
 		//seting frame limit to 50   --1/50 * 1000--
 		DeltaTime = getTickCount() - time;
 		time = getTickCount();
@@ -190,6 +197,27 @@ public:
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(20 - DeltaTime));
 		}
+		//Immunity Control
+		if (time - RespawnShieldTimer > RandomTimer)
+		{
+			RespawnShieldTimer = time;
+			RandomTimer = ShieldSpawn(gen);
+			ImmunityShield->PosX = ShieldRndmXpos(gen);
+			ImmunityShield->PosY = ShieldRndmYpos(gen);
+			IsShieldVisible = true;
+		}
+		if (time-ImmunityStartTime > 20000)
+		{
+			IsPlayerImmune = false;
+		}
+		if (Doodle->IsCollidingWith(*ImmunityShield, 15))
+		{
+			ImmunityStartTime = time;
+			IsPlayerImmune = true;
+			IsShieldVisible = false;
+		}
+
+
 		drawSprite(Background->sprite, 0, 0);
 		//Player Movement
 		jump += 0.2;
@@ -257,6 +285,7 @@ public:
 		if (Doodle->PosY < Background->Height / 2)
 		{
 			Score_Distance++;
+			ImmunityShield->PosY -= jump;
 			for (int i = 0; i < Number_Of_Platforms; i++)
 			{
 				Doodle->PosY = Background->Height / 2;
@@ -321,6 +350,8 @@ public:
 			Bullet->PosX = Doodle->PosX + (Doodle->Width / 2) - Bullet->Width / 2;
 			Bullet->PosY = Doodle->PosY - Bullet->Height;
 		}
+		if (IsShieldVisible)
+			drawSprite(ImmunityShield->sprite, ImmunityShield->PosX, ImmunityShield->PosY);
 		return false;
 	}
 	void ResetLevel()
