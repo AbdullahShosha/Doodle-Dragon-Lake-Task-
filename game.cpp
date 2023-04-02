@@ -15,7 +15,7 @@ bool BulletIsMoving = false;
 int MouseXpos, MouseYpos;
 
 //Higher number means less enemies
-int FindingEnemyProbability = 10;
+int FindingEnemyProbability = 5 ,OneUseProbability = 5;
 
 int Window_Width;
 int Window_Height;
@@ -31,12 +31,15 @@ const char* DoodleLeftPath = "data\\X\\bunny-left.png";
 const char* DoodleRightPath= "data\\X\\bunny-right.png";
 const char* DoodleIdlePath = "data\\X\\bunny-puca.png";
 const char* PlatformPath   = "data\\X\\Platform.png";
+const char* Platform2Path   = "data\\X\\Platform2.png";
 const char* EnemyPath	   = "data\\X\\Monster.png";
 const char* BulletPath     = "data\\X\\bubble@2x.png";
 
 Sprite* DoodleLeft;
 Sprite* DoodleRight;
 Sprite* DoodleIdle;
+Sprite* MainPlatfom;
+Sprite* OneusePlatfom;
 Sprite* Enemy;
 Sprite* bullet;
 
@@ -74,6 +77,8 @@ public:
 	Drawable* Platform;
 	Drawable* Enemy;
 	bool* EnemyExist;
+	bool* PlatformExists;
+	bool* Oneuse;
 	Drawable* Bullet;
 
 
@@ -87,7 +92,8 @@ public:
 		Platform = new Drawable[Number_Of_Platforms];
 		Enemy	 = new Drawable[Number_Of_Platforms];
 		EnemyExist = new bool[Number_Of_Platforms];
-		
+		PlatformExists = new bool[Number_Of_Platforms];
+		Oneuse = new bool[Number_Of_Platforms];
 		width = Window_Width;
 		height = Window_Height;
 		fullscreen = false;
@@ -114,20 +120,33 @@ public:
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Platform[i].PosY = PlatformRndmYpos(gen);
 			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+			PlatformExists[i] = true;
 			if ((rand()% FindingEnemyProbability) == 0)
 				EnemyExist[i] = true;
+			else EnemyExist[i] = false;
+			if ((rand() % OneUseProbability) == 0)
+			{
+				Oneuse[i] = true;
+				Platform[i].sprite = createSprite(Platform2Path);
+				setSpriteSize(Platform[i].sprite, Platform[i].Width, Platform[i].Height);
+			}
+			else Oneuse[i] = false;
 		}
 		Background ->sprite  = createSprite(Background->Path);
 		Doodle ->sprite  = createSprite(Doodle->Path);
 		DoodleLeft = createSprite(DoodleLeftPath);
 		DoodleRight = createSprite(DoodleRightPath);
 		DoodleIdle = createSprite(DoodleIdlePath);
+		OneusePlatfom = createSprite(Platform2Path);
+		MainPlatfom = createSprite(PlatformPath);
 
 		setSpriteSize(Background->sprite, Background->Width, Background->Height);
 		setSpriteSize(Doodle->sprite, Doodle->Width, Doodle->Height);
 		setSpriteSize(DoodleLeft,  Doodle->Width, Doodle->Height);
 		setSpriteSize(DoodleRight, Doodle->Width, Doodle->Height);
 		setSpriteSize(DoodleIdle , Doodle->Width ,Doodle->Height);
+		setSpriteSize(OneusePlatfom, Platform[0].Width, Platform[0].Height);
+		setSpriteSize(MainPlatfom, Platform[0].Width, Platform[0].Height);
 		Bullet = new Drawable;
 		Bullet->Path = BulletPath;
 		Bullet->sprite = createSprite(BulletPath);
@@ -163,10 +182,13 @@ public:
 		{
 			if ((((Doodle->PosX + Doodle->Width - 15 > Platform[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Platform[i].PosX + Platform[i].Width)) ||// left collision
 				((Doodle->PosX + 15 > Platform[i].PosX) && (Doodle->PosX + 15 < Platform[i].PosX + Platform[i].Width)))// right collision
-				&&(Doodle->PosY + Doodle->Height > Platform[i].PosY) 
-				&&(Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
-				&&jump > 0)
+				&& (Doodle->PosY + Doodle->Height > Platform[i].PosY)
+				&& (Doodle->PosY + Doodle->Height < Platform[i].PosY + Platform[i].Height)
+				&& jump > 0)
+			{
+				if (Oneuse[i] && PlatformExists) PlatformExists[i] = false;
 				jump = -10 * Height_Scalar;
+			}
 			//killing Monsters
 			// the 15 here is offset to ignore the ears and doodle gun
 			if    ((((Doodle->PosX + Doodle->Width - 15 > Enemy[i].PosX) && (Doodle->PosX + Doodle->Width - 15 < Enemy[i].PosX + Enemy[i].Width))||// left collision
@@ -181,8 +203,9 @@ public:
 				}
 				else ResetLevel();
 			}
-			
-
+			if (Oneuse[i])Platform[i].sprite = OneusePlatfom;
+			else Platform[i].sprite = MainPlatfom;
+			if(PlatformExists[i])
 			drawSprite(Platform[i].sprite, Platform[i].PosX, Platform[i].PosY);
 			if(EnemyExist[i])
 			drawSprite(Enemy[i].sprite, Enemy[i].PosX, Platform[i].PosY - Enemy[i].Height);
@@ -231,8 +254,13 @@ public:
 					std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 					Enemy[i].PosX = EnemyRndmXpos(gen);
 					Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+					PlatformExists[i] = true;
 					if ((rand() % FindingEnemyProbability) == 0)
 						EnemyExist[i] = true;
+					else EnemyExist[i] = false;
+					if ((rand() % OneUseProbability) == 0)
+						Oneuse[i] = true;
+					else Oneuse[i] = false;
 				}
 			}
 			SetConsoleCursorPosition(hConsole, pos);
@@ -254,6 +282,7 @@ public:
 			Bullet->PosY = BulletStartPosY + round(DoneDistanceY);
 			//std::cout << "BulletStartPosX " << BulletStartPosX << "\nBulletStartPosX" << BulletStartPosX;
 			drawSprite(Bullet->sprite, Bullet->PosX , Bullet->PosY);
+
 			if ((getTickCount() - ShootingStartTime) >= 3000 || Bullet->PosY < 0 || Bullet->PosY > Background->Height)
 			{
 				BulletIsMoving = false;
@@ -301,8 +330,13 @@ public:
 			std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 			Enemy[i].PosX = EnemyRndmXpos(gen);
 			Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+			PlatformExists[i] = true;
 			if ((rand() % FindingEnemyProbability) == 0)
 				EnemyExist[i] = true;
+			else EnemyExist[i] = false;
+			if ((rand() % OneUseProbability) == 0)
+				Oneuse[i] = true;
+			else Oneuse[i] = false;
 		}
 	}
 	virtual void onMouseMove(int x, int y, int xrelative, int yrelative) {
@@ -322,8 +356,13 @@ public:
 				std::uniform_int_distribution<> EnemyRndmXpos(Platform[i].PosX, Platform[i].PosX + Platform[i].Width - Enemy[i].Width);
 				Enemy[i].PosX = EnemyRndmXpos(gen);
 				Enemy[i].PosY = Platform[i].PosY - Enemy[i].Height;
+				PlatformExists[i] = true;
 				if ((rand() % FindingEnemyProbability) == 0)
 					EnemyExist[i] = true;
+				else EnemyExist[i] = false;
+				if ((rand() % OneUseProbability) == 0)
+					Oneuse[i] = true;
+				else Oneuse[i] = false;
 			}
 		}
 		if (button == FRMouseButton::LEFT)
