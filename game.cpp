@@ -34,6 +34,7 @@ const char* PlatformPath   = "data\\X\\Platform.png";
 const char* Platform2Path   = "data\\X\\Platform2.png";
 const char* EnemyPath	   = "data\\X\\Monster.png";
 const char* BulletPath     = "data\\X\\bubble@2x.png";
+const char* ImmunityShiledPath = "data\\X\\Shield.png";
 
 Sprite* DoodleLeft;
 Sprite* DoodleRight;
@@ -88,10 +89,12 @@ public:
 	Drawable* Doodle;
 	Drawable* Platform;
 	Drawable* Enemy;
+	Drawable* Bullet;
+	Drawable* ImmunityShield;
 	bool* EnemyExist;
 	bool* PlatformExists;
 	bool* Oneuse;
-	Drawable* Bullet;
+	bool IsPlayerImmune = true;
 
 
 	virtual void PreInit(int& width, int& height, bool& fullscreen)
@@ -100,6 +103,7 @@ public:
 		Height_Scalar = Window_Height / 1024.0;
 		Background  = new Drawable(BackgroundPath, Window_Width, Window_Height, 0, 0);
 		Doodle = new Drawable(DoodleIdlePath, 62 * Width_Scalar, 60 * Height_Scalar, Background->Width / 2 - (31 * Width_Scalar), Background->Height / 2 - (30 * Height_Scalar));
+		ImmunityShield = new Drawable(ImmunityShiledPath, 30, 30, 0, 0);
 		CloneXpos = Doodle->PosX;
 		Platform = new Drawable[Number_Of_Platforms];
 		Enemy	 = new Drawable[Number_Of_Platforms];
@@ -151,6 +155,7 @@ public:
 		DoodleIdle = createSprite(DoodleIdlePath);
 		OneusePlatfom = createSprite(Platform2Path);
 		MainPlatfom = createSprite(PlatformPath);
+		ImmunityShield->sprite = createSprite(ImmunityShiledPath);
 
 		setSpriteSize(Background->sprite, Background->Width, Background->Height);
 		setSpriteSize(Doodle->sprite, Doodle->Width, Doodle->Height);
@@ -159,6 +164,8 @@ public:
 		setSpriteSize(DoodleIdle , Doodle->Width ,Doodle->Height);
 		setSpriteSize(OneusePlatfom, Platform[0].Width, Platform[0].Height);
 		setSpriteSize(MainPlatfom, Platform[0].Width, Platform[0].Height);
+		setSpriteSize(ImmunityShield->sprite, 30, 30);
+
 		Bullet = new Drawable;
 		Bullet->Path = BulletPath;
 		Bullet->sprite = createSprite(BulletPath);
@@ -205,7 +212,7 @@ public:
 			// the 15 here is offset to ignore the ears and doodle gun
 			if    (Doodle->IsCollidingWith(Enemy[i], 15) && EnemyExist[i])
 			{
-				if ((jump > 0))
+				if ((jump > 0) || IsPlayerImmune)
 				{
 					EnemyExist[i] = false;
 					Score_Enemies_killed++;
@@ -279,7 +286,8 @@ public:
 		}
 		drawSprite(Doodle->sprite, Doodle->PosX, Doodle->PosY);	
 		drawSprite(Doodle->sprite, CloneXpos, Doodle->PosY);
-		
+		if (IsPlayerImmune)
+			drawSprite(ImmunityShield->sprite, Doodle->PosX +Doodle->Width/2 - ImmunityShield->Width/2, Doodle->PosY + Doodle->Height / 2 - ImmunityShield->Height/2 );
 		if (BulletIsMoving)
 		{
 			//std::cout << "BulletXMovement " << BulletXMovement << "\nBulletYMovement" << BulletYMovement;
